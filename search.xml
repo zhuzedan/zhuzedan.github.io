@@ -1,0 +1,251 @@
+<?xml version="1.0" encoding="utf-8"?>
+<search> 
+  
+  
+    
+    <entry>
+      <title>测试</title>
+      <link href="/2023/02/01/%E6%B5%8B%E8%AF%95/"/>
+      <url>/2023/02/01/%E6%B5%8B%E8%AF%95/</url>
+      
+        <content type="html"><![CDATA[]]></content>
+      
+      
+      
+    </entry>
+    
+    
+    
+    <entry>
+      <title>[redis]黑马点评-商铺类型缓存（练习题）</title>
+      <link href="/2022/10/26/redis%5D%E9%A9%AC%E7%82%B9%E8%AF%84-%E5%95%86%E9%93%BA%E7%B1%BB%E5%9E%8B%E7%BC%93%E5%AD%98%EF%BC%88%E7%BB%83%E4%B9%A0%E9%A2%98%EF%BC%89/"/>
+      <url>/2022/10/26/redis%5D%E9%A9%AC%E7%82%B9%E8%AF%84-%E5%95%86%E9%93%BA%E7%B1%BB%E5%9E%8B%E7%BC%93%E5%AD%98%EF%BC%88%E7%BB%83%E4%B9%A0%E9%A2%98%EF%BC%89/</url>
+      
+        <content type="html"><![CDATA[<p>黑马点评P37集，给商铺类型业务添加缓存。<br>和上一条商户缓存不同的是，商户类型的数据是list集合类型，需要做一些改动。</p><p>ShopTypeController</p><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@RestController</span></span><br><span class="line"><span class="meta">@RequestMapping(&quot;/shop-type&quot;)</span></span><br><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title class_">ShopTypeController</span> &#123;</span><br><span class="line">    <span class="meta">@Resource</span></span><br><span class="line">    <span class="keyword">private</span> IShopTypeService typeService;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@GetMapping(&quot;list&quot;)</span></span><br><span class="line">    <span class="keyword">public</span> Result <span class="title function_">queryTypeList</span><span class="params">()</span> &#123;</span><br><span class="line">        <span class="keyword">return</span> typeService.queryList();</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure><p>IShopTypeService</p><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">interface</span> <span class="title class_">IShopTypeService</span> <span class="keyword">extends</span> <span class="title class_">IService</span>&lt;ShopType&gt; &#123;</span><br><span class="line"></span><br><span class="line">    Result <span class="title function_">queryList</span><span class="params">()</span>;</span><br><span class="line">&#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure><p>ShopTypeServiceImpl</p><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Service</span></span><br><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title class_">ShopTypeServiceImpl</span> <span class="keyword">extends</span> <span class="title class_">ServiceImpl</span>&lt;ShopTypeMapper, ShopType&gt; <span class="keyword">implements</span> <span class="title class_">IShopTypeService</span> &#123;</span><br><span class="line">    <span class="meta">@Resource</span></span><br><span class="line">    <span class="keyword">private</span> StringRedisTemplate stringRedisTemplate;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="keyword">public</span> Result <span class="title function_">queryList</span><span class="params">()</span> &#123;</span><br><span class="line">        <span class="type">String</span> <span class="variable">key</span> <span class="operator">=</span> CACHE_TYPE_LIST;</span><br><span class="line">        <span class="comment">//从redis中查询类型缓存</span></span><br><span class="line">        <span class="type">String</span> <span class="variable">typeJson</span> <span class="operator">=</span> stringRedisTemplate.opsForValue().get(key);</span><br><span class="line">        <span class="comment">//如果缓存不为空，直接返回</span></span><br><span class="line">        <span class="keyword">if</span> (StrUtil.isNotBlank(typeJson)) &#123;</span><br><span class="line">            List&lt;ShopType&gt; shopTypeList = JSONUtil.toList(typeJson, ShopType.class);</span><br><span class="line">            <span class="keyword">return</span> Result.ok(shopTypeList);</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="comment">//为空，查询</span></span><br><span class="line">        List&lt;ShopType&gt; shopTypeList = query().orderByAsc(<span class="string">&quot;sort&quot;</span>).list();</span><br><span class="line">        <span class="comment">//将数据库信息保存到缓存</span></span><br><span class="line">        stringRedisTemplate.opsForValue().set(key,JSONUtil.toJsonStr(shopTypeList));</span><br><span class="line">        <span class="keyword">return</span> Result.ok(shopTypeList);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure><p><img src="https://zhuzedan.oss-cn-hangzhou.aliyuncs.com/img/image-20221026214041517.png" alt="image-20221026214041517"></p><p><img src="https://zhuzedan.oss-cn-hangzhou.aliyuncs.com/img/image-20221026214130195.png" alt="image-20221026214130195"></p><p>可以看出缓存之后，刷新的时间变少了</p>]]></content>
+      
+      
+      
+        <tags>
+            
+            <tag> redis </tag>
+            
+        </tags>
+      
+    </entry>
+    
+    
+    
+    <entry>
+      <title>Redis安装说明 </title>
+      <link href="/2022/10/16/Redis%E5%AE%89%E8%A3%85%E8%AF%B4%E6%98%8E/"/>
+      <url>/2022/10/16/Redis%E5%AE%89%E8%A3%85%E8%AF%B4%E6%98%8E/</url>
+      
+        <content type="html"><![CDATA[<h1 id="Redis安装说明"><a href="#Redis安装说明" class="headerlink" title="Redis安装说明"></a>Redis安装说明</h1><p>大多数企业都是基于Linux服务器来部署项目，而且Redis官方也没有提供Windows版本的安装包。因此课程中我们会基于Linux系统来安装Redis.</p><p>此处选择的Linux版本为CentOS 7.</p><p>Redis的官方网站地址：<a href="https://redis.io/">https://redis.io/</a></p><h1 id="1-单机安装Redis"><a href="#1-单机安装Redis" class="headerlink" title="1.单机安装Redis"></a>1.单机安装Redis</h1><h2 id="1-1-安装Redis依赖"><a href="#1-1-安装Redis依赖" class="headerlink" title="1.1.安装Redis依赖"></a>1.1.安装Redis依赖</h2><p>Redis是基于C语言编写的，因此首先需要安装Redis所需要的gcc依赖：</p><figure class="highlight sh"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">yum install -y gcc tcl</span><br></pre></td></tr></table></figure><p>打开MobaXterm,连接ip地址，进行redis的安装</p><p><img src="https://zhuzedan.oss-cn-hangzhou.aliyuncs.com/img/image-20221016201441577.png" alt="image-20221016201441577"></p><h2 id="1-2-上传安装包并解压"><a href="#1-2-上传安装包并解压" class="headerlink" title="1.2.上传安装包并解压"></a>1.2.上传安装包并解压</h2><p>然后将课前资料提供的Redis安装包上传到虚拟机的任意目录：</p><p><img src="https://zhuzedan.oss-cn-hangzhou.aliyuncs.com/img/image-20211211071712536.png" alt="image-20211211071712536"></p><p>例如，我放到了&#x2F;usr&#x2F;local&#x2F;src 目录：</p><p><img src="https://zhuzedan.oss-cn-hangzhou.aliyuncs.com/img/image-20211211080151539.png" alt="image-20211211080151539"></p><p>解压缩：</p><figure class="highlight sh"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">tar -xzf redis-6.2.6.tar.gz</span><br></pre></td></tr></table></figure><p>解压后：</p><p><img src="https://zhuzedan.oss-cn-hangzhou.aliyuncs.com/img/image-20211211080339076.png" alt="image-20211211080339076"></p><p>进入redis目录：</p><figure class="highlight sh"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">cd</span> redis-6.2.6</span><br></pre></td></tr></table></figure><p>运行编译命令：</p><figure class="highlight sh"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">make &amp;&amp; make install</span><br></pre></td></tr></table></figure><p>如果没有出错，应该就安装成功了。</p><p>默认的安装路径是在 <code>/usr/local/bin</code>目录下：</p><p><img src="https://zhuzedan.oss-cn-hangzhou.aliyuncs.com/img/image-20211211080603710.png" alt="image-20211211080603710"></p><p>该目录以及默认配置到环境变量，因此可以在任意目录下运行这些命令。其中：</p><ul><li>redis-cli：是redis提供的命令行客户端</li><li>redis-server：是redis的服务端启动脚本</li><li>redis-sentinel：是redis的哨兵启动脚本</li></ul><h2 id="1-3-启动"><a href="#1-3-启动" class="headerlink" title="1.3.启动"></a>1.3.启动</h2><p>redis的启动方式有很多种，例如：</p><ul><li>默认启动</li><li>指定配置启动</li><li>开机自启</li></ul><h3 id="1-3-1-默认启动"><a href="#1-3-1-默认启动" class="headerlink" title="1.3.1.默认启动"></a>1.3.1.默认启动</h3><p>安装完成后，在任意目录输入redis-server命令即可启动Redis：</p><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">redis-server</span><br></pre></td></tr></table></figure><p>如图：</p><p><img src="https://zhuzedan.oss-cn-hangzhou.aliyuncs.com/img/image-20211211081716167.png" alt="image-20211211081716167"></p><p>这种启动属于<code>前台启动</code>，会阻塞整个会话窗口，窗口关闭或者按下<code>CTRL + C</code>则Redis停止。不推荐使用。</p><h3 id="1-3-2-指定配置启动"><a href="#1-3-2-指定配置启动" class="headerlink" title="1.3.2.指定配置启动"></a>1.3.2.指定配置启动</h3><p>如果要让Redis以<code>后台</code>方式启动，则必须修改Redis配置文件，就在我们之前解压的redis安装包下（<code>/usr/local/src/redis-6.2.6</code>），名字叫redis.conf：</p><p><img src="https://zhuzedan.oss-cn-hangzhou.aliyuncs.com/img/image-20211211082225509.png" alt="image-20211211082225509"></p><p>我们先将这个配置文件备份一份：</p><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">cp redis.conf redis.conf.bck</span><br></pre></td></tr></table></figure><p>然后修改redis.conf文件中的一些配置：</p><p>修改命令：vi redis.conf</p><p>搜索：先按esc 再按&#x2F; </p><p>跳到下一个搜索结果：按n键</p><figure class="highlight properties"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 允许访问的地址，默认是127.0.0.1，会导致只能在本地访问。修改为0.0.0.0则可以在任意IP访问，生产环境不要设置为0.0.0.0</span></span><br><span class="line"><span class="attr">bind</span> <span class="string">0.0.0.0</span></span><br><span class="line"><span class="comment"># 守护进程，修改为yes后即可后台运行</span></span><br><span class="line"><span class="attr">daemonize</span> <span class="string">yes </span></span><br><span class="line"><span class="comment"># 密码，设置后访问Redis必须输入密码</span></span><br><span class="line"><span class="attr">requirepass</span> <span class="string">123456</span></span><br></pre></td></tr></table></figure><p>Redis的其它常见配置：</p><figure class="highlight properties"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 监听的端口</span></span><br><span class="line"><span class="attr">port</span> <span class="string">6379</span></span><br><span class="line"><span class="comment"># 工作目录，默认是当前目录，也就是运行redis-server时的命令，日志、持久化等文件会保存在这个目录</span></span><br><span class="line"><span class="attr">dir</span> <span class="string">.</span></span><br><span class="line"><span class="comment"># 数据库数量，设置为1，代表只使用1个库，默认有16个库，编号0~15</span></span><br><span class="line"><span class="attr">databases</span> <span class="string">1</span></span><br><span class="line"><span class="comment"># 设置redis能够使用的最大内存</span></span><br><span class="line"><span class="attr">maxmemory</span> <span class="string">512mb</span></span><br><span class="line"><span class="comment"># 日志文件，默认为空，不记录日志，可以指定日志文件名</span></span><br><span class="line"><span class="attr">logfile</span> <span class="string">&quot;redis.log&quot;</span></span><br></pre></td></tr></table></figure><p>启动Redis：</p><figure class="highlight sh"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 进入redis安装目录 </span></span><br><span class="line"><span class="built_in">cd</span> /usr/local/src/redis-6.2.6</span><br><span class="line"><span class="comment"># 启动</span></span><br><span class="line">redis-server redis.conf</span><br></pre></td></tr></table></figure><p><img src="https://zhuzedan.oss-cn-hangzhou.aliyuncs.com/img/image-20221016204540460.png" alt="image-20221016204540460"></p><p>我们可以看到启动之后是没有反应的，那么如何查看启动之后是否是运行的</p><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">ps -ef | grep redis</span><br></pre></td></tr></table></figure><p>用kill -9 进程名来杀死进程</p><p><img src="https://zhuzedan.oss-cn-hangzhou.aliyuncs.com/img/image-20221016204827708.png" alt="image-20221016204827708"></p><p>停止服务：</p><figure class="highlight sh"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 利用redis-cli来执行 shutdown 命令，即可停止 Redis 服务，</span></span><br><span class="line"><span class="comment"># 因为之前配置了密码，因此需要通过 -u 来指定密码</span></span><br><span class="line">redis-cli -u 123456 shutdown</span><br></pre></td></tr></table></figure><h3 id="1-3-3-开机自启"><a href="#1-3-3-开机自启" class="headerlink" title="1.3.3.开机自启"></a>1.3.3.开机自启</h3><p>我们也可以通过配置来实现开机自启。</p><p>首先，新建一个系统服务文件：</p><figure class="highlight sh"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">vi /etc/systemd/system/redis.service</span><br></pre></td></tr></table></figure><p>内容如下：</p><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">[Unit]</span><br><span class="line">Description=redis-server</span><br><span class="line">After=network.target</span><br><span class="line"></span><br><span class="line">[Service]</span><br><span class="line">Type=forking</span><br><span class="line">ExecStart=/usr/local/bin/redis-server /usr/local/src/redis-6.2.6/redis.conf</span><br><span class="line">PrivateTmp=true</span><br><span class="line"></span><br><span class="line">[Install]</span><br><span class="line">WantedBy=multi-user.target</span><br></pre></td></tr></table></figure><p>然后重载系统服务：</p><figure class="highlight sh"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">systemctl daemon-reload</span><br></pre></td></tr></table></figure><p>现在，我们可以用下面这组命令来操作redis了：</p><figure class="highlight sh"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 启动</span></span><br><span class="line">systemctl start redis</span><br><span class="line"><span class="comment"># 停止</span></span><br><span class="line">systemctl stop redis</span><br><span class="line"><span class="comment"># 重启</span></span><br><span class="line">systemctl restart redis</span><br><span class="line"><span class="comment"># 查看状态</span></span><br><span class="line">systemctl status redis</span><br></pre></td></tr></table></figure><p>执行下面的命令，可以让redis开机自启：</p><figure class="highlight sh"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">systemctl <span class="built_in">enable</span> redis</span><br></pre></td></tr></table></figure><h1 id="2-Redis客户端"><a href="#2-Redis客户端" class="headerlink" title="2.Redis客户端"></a>2.Redis客户端</h1><p>安装完成Redis，我们就可以操作Redis，实现数据的CRUD了。这需要用到Redis客户端，包括：</p><ul><li>命令行客户端</li><li>图形化桌面客户端</li><li>编程客户端</li></ul><h2 id="2-1-Redis命令行客户端"><a href="#2-1-Redis命令行客户端" class="headerlink" title="2.1.Redis命令行客户端"></a>2.1.Redis命令行客户端</h2><p>Redis安装完成后就自带了命令行客户端：redis-cli，使用方式如下：</p><figure class="highlight sh"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">redis-cli [options] [commonds]</span><br></pre></td></tr></table></figure><p>其中常见的options有：</p><ul><li><code>-h 127.0.0.1</code>：指定要连接的redis节点的IP地址，默认是127.0.0.1</li><li><code>-p 6379</code>：指定要连接的redis节点的端口，默认是6379</li><li><code>-a 123321</code>：指定redis的访问密码</li></ul><p>其中的commonds就是Redis的操作命令，例如：</p><ul><li><code>ping</code>：与redis服务端做心跳测试，服务端正常会返回<code>pong</code></li></ul><p>不指定commond时，会进入<code>redis-cli</code>的交互控制台：</p><p><img src="https://zhuzedan.oss-cn-hangzhou.aliyuncs.com/img/image-20211211110439353.png" alt="image-20211211110439353"></p><h2 id="2-2-图形化桌面客户端"><a href="#2-2-图形化桌面客户端" class="headerlink" title="2.2.图形化桌面客户端"></a>2.2.图形化桌面客户端</h2><p>GitHub上的大神编写了Redis的图形化桌面客户端，地址：<a href="https://github.com/uglide/RedisDesktopManager">https://github.com/uglide/RedisDesktopManager</a></p><p>不过该仓库提供的是RedisDesktopManager的源码，并未提供windows安装包。</p><p>在下面这个仓库可以找到安装包：<a href="https://github.com/lework/RedisDesktopManager-Windows/releases">https://github.com/lework/RedisDesktopManager-Windows/releases</a></p><p><img src="https://zhuzedan.oss-cn-hangzhou.aliyuncs.com/img/image-20211211111351885.png" alt="image-20211211111351885"></p><h3 id="2-2-1-安装"><a href="#2-2-1-安装" class="headerlink" title="2.2.1.安装"></a>2.2.1.安装</h3><p>在课前资料中可以找到Redis的图形化桌面客户端：</p><p><img src="https://zhuzedan.oss-cn-hangzhou.aliyuncs.com/img/image-20211214154938770.png" alt="image-20211214154938770"></p><p>解压缩后，运行安装程序即可安装：</p><p><img src="https://zhuzedan.oss-cn-hangzhou.aliyuncs.com/img/image-20211214155123841.png" alt="image-20211214155123841"></p><p>此处略。</p><p>安装完成后，在安装目录下找到rdm.exe文件：</p><p><img src="https://zhuzedan.oss-cn-hangzhou.aliyuncs.com/img/image-20211211110935819.png" alt="image-20211211110935819"></p><p>双击即可运行：</p><p><img src="https://zhuzedan.oss-cn-hangzhou.aliyuncs.com/img/image-20211214155406692.png" alt="image-20211214155406692"></p><h3 id="2-2-2-建立连接"><a href="#2-2-2-建立连接" class="headerlink" title="2.2.2.建立连接"></a>2.2.2.建立连接</h3><p>点击左上角的<code>连接到Redis服务器</code>按钮：</p><p><img src="https://zhuzedan.oss-cn-hangzhou.aliyuncs.com/img/image-20211214155424842.png" alt="image-20211214155424842"></p><p>在弹出的窗口中填写Redis服务信息：</p><p><img src="https://zhuzedan.oss-cn-hangzhou.aliyuncs.com/img/image-20211211111614483.png" alt="image-20211211111614483"></p><p>点击确定后，在左侧菜单会出现这个链接：</p><p><img src="https://zhuzedan.oss-cn-hangzhou.aliyuncs.com/img/image-20211214155804523.png" alt="image-20211214155804523"></p><p>点击即可建立连接了：</p><p><img src="https://zhuzedan.oss-cn-hangzhou.aliyuncs.com/img/image-20211214155849495.png" alt="image-20211214155849495"></p><p>Redis默认有16个仓库，编号从0至15.  通过配置文件可以设置仓库数量，但是不超过16，并且不能自定义仓库名称。</p><p>如果是基于redis-cli连接Redis服务，可以通过select命令来选择数据库：</p><figure class="highlight sh"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 选择 0号库</span></span><br><span class="line">select 0</span><br></pre></td></tr></table></figure>]]></content>
+      
+      
+      
+        <tags>
+            
+            <tag> redis </tag>
+            
+        </tags>
+      
+    </entry>
+    
+    
+    
+    <entry>
+      <title>Failed to connect to github.com port 443 after 21092 ms: Timed out解决 </title>
+      <link href="/2022/09/26/Failed%20to%20connect%20to%20github/"/>
+      <url>/2022/09/26/Failed%20to%20connect%20to%20github/</url>
+      
+        <content type="html"><![CDATA[<p>Failed to connect to github.com port 443 after 21092 ms: Timed out解决</p><p>由于之前翻墙，clash把电脑设置了代理，导致传代码到github的时候报错。</p><p>因此解决方法是取消掉代理，然后再上传代码</p><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">git config --global https.proxy</span><br></pre></td></tr></table></figure><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">git config --global --unset http.proxy</span><br></pre></td></tr></table></figure><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">git config --global --unset https.proxy</span><br></pre></td></tr></table></figure>]]></content>
+      
+      
+      
+        <tags>
+            
+            <tag> git </tag>
+            
+        </tags>
+      
+    </entry>
+    
+    
+    
+    <entry>
+      <title>The dependencies of some of the beans in the application context form a cycle: </title>
+      <link href="/2022/09/26/%E5%BE%AA%E7%8E%AF%E5%BC%82%E5%B8%B8/"/>
+      <url>/2022/09/26/%E5%BE%AA%E7%8E%AF%E5%BC%82%E5%B8%B8/</url>
+      
+        <content type="html"><![CDATA[<p>循环异常</p><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line">***************************</span><br><span class="line">APPLICATION FAILED TO START</span><br><span class="line">***************************</span><br><span class="line"></span><br><span class="line">Description:</span><br><span class="line"></span><br><span class="line">The dependencies of some of the beans in the application context form a cycle:</span><br><span class="line"></span><br><span class="line">   articleController (field private com.zzd.service.ArticleService com.zzd.controller.ArticleController.articleService)</span><br><span class="line">┌─────┐</span><br><span class="line">|  articleService (field private com.zzd.service.CategoryService com.zzd.service.impl.ArticleServiceImpl.categoryService)</span><br><span class="line">↑     ↓</span><br><span class="line">|  categoryService (field private com.zzd.service.ArticleService com.zzd.service.impl.CategoryServiceImpl.articleService)</span><br><span class="line">└─────┘</span><br><span class="line"></span><br><span class="line"></span><br><span class="line">Action:</span><br><span class="line"></span><br><span class="line">Relying upon circular references is discouraged and they are prohibited by default. Update your application to remove the dependency cycle between beans. As a last resort, it may be possible to break the cycle automatically by setting spring.main.allow-circular-references to true.</span><br><span class="line"></span><br></pre></td></tr></table></figure><p>解决方案</p><p>配置文件内加上</p><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">spring:</span><br><span class="line">  main:</span><br><span class="line">    allow-circular-references: true</span><br></pre></td></tr></table></figure>]]></content>
+      
+      
+      
+        <tags>
+            
+            <tag> springboot </tag>
+            
+        </tags>
+      
+    </entry>
+    
+    
+    
+    <entry>
+      <title>error: unable to read askpass response from &#39; </title>
+      <link href="/2022/09/20/error-unable-to-read-askpass-response-from/"/>
+      <url>/2022/09/20/error-unable-to-read-askpass-response-from/</url>
+      
+        <content type="html"><![CDATA[<h3 id="error-unable-to-read-askpass-response-from-‘’"><a href="#error-unable-to-read-askpass-response-from-‘’" class="headerlink" title="error: unable to read askpass response from ‘’"></a>error: unable to read askpass response from ‘’</h3><p>今天上班跟平常一样pull代码，发现竟然拉不下来。</p><p><img src="https://zhuzedan.oss-cn-hangzhou.aliyuncs.com/%20img/image-20220920095815254.png" alt="image-20220920095815254"></p><p>上网查询后得到解决方案</p><p>打开自己项目根目录的.git文件，打开config文件</p><p><img src="https://zhuzedan.oss-cn-hangzhou.aliyuncs.com/%20img/image-20220920100042312.png" alt="image-20220920100042312"></p><p>修改url的内容</p><p>修改前</p><p><img src="https://zhuzedan.oss-cn-hangzhou.aliyuncs.com/%20img/image-20220920100148285.png" alt="image-20220920100148285"></p><p>修改</p><p>http:&#x2F;&#x2F;用户名(或者你的邮箱):密码@192.168…..</p><p>修改后</p><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">url = http://zhuzedan:zzd@192.168.2.18:2017/tianyige/v2/admin_antdv.git</span><br></pre></td></tr></table></figure><p>再次拉取代码，成功！</p><p><img src="https://zhuzedan.oss-cn-hangzhou.aliyuncs.com/%20img/image-20220920100610104.png" alt="image-20220920100610104"></p>]]></content>
+      
+      
+      
+        <tags>
+            
+            <tag> git </tag>
+            
+        </tags>
+      
+    </entry>
+    
+    
+    
+    <entry>
+      <title>hexo个人博客搭建，保姆级教学 </title>
+      <link href="/2022/09/20/2022-09-27hexo%E4%B8%AA%E4%BA%BA%E5%8D%9A%E5%AE%A2%E6%90%AD%E5%BB%BA/"/>
+      <url>/2022/09/20/2022-09-27hexo%E4%B8%AA%E4%BA%BA%E5%8D%9A%E5%AE%A2%E6%90%AD%E5%BB%BA/</url>
+      
+        <content type="html"><![CDATA[<p>hexo个人博客搭建，保姆级教学</p><h3 id="前期准备"><a href="#前期准备" class="headerlink" title="前期准备"></a>前期准备</h3><p>node.js</p><p>git</p><h3 id="安装步骤"><a href="#安装步骤" class="headerlink" title="安装步骤"></a>安装步骤</h3><h4 id="1安装hexo"><a href="#1安装hexo" class="headerlink" title="1安装hexo"></a>1安装hexo</h4><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">npm install -g hexo-cli</span><br></pre></td></tr></table></figure><p>检查是否安装成功</p><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">hexo -v</span><br></pre></td></tr></table></figure><h4 id="2新建github仓库"><a href="#2新建github仓库" class="headerlink" title="2新建github仓库"></a>2新建github仓库</h4><p>作为hexo的服务器，装在github的仓库中</p><p><strong>注意</strong> 仓库的名字是固定的：你github的名字.github.io</p><h4 id="3生成sshkeys"><a href="#3生成sshkeys" class="headerlink" title="3生成sshkeys"></a>3生成sshkeys</h4><p>让github与本地进行绑定</p><p>git bash here</p><p>输入ssh，检查我们有没有安装过ssh</p><p>然后输入命令</p><p>ssh-keygen -t rsa -C “<a href="mailto:&#49;&#48;&#51;&#x31;&#x31;&#x35;&#53;&#x38;&#x31;&#55;&#x40;&#113;&#x71;&#x2e;&#99;&#x6f;&#x6d;">&#49;&#48;&#51;&#x31;&#x31;&#x35;&#53;&#x38;&#x31;&#55;&#x40;&#113;&#x71;&#x2e;&#99;&#x6f;&#x6d;</a>“</p><p><img src="https://zhuzedan.oss-cn-hangzhou.aliyuncs.com/img/image-20220918153306169.png" alt="image-20220918153306169"></p><p>按四次回车</p><p>打开下面那个全选</p><p>打开github新建keys</p><p>把钥匙放进去</p><p>然后确定是否绑定成功</p><p>ssh -T <a href="mailto:&#x67;&#105;&#x74;&#64;&#x67;&#x69;&#x74;&#x68;&#x75;&#98;&#46;&#99;&#x6f;&#109;">&#x67;&#105;&#x74;&#64;&#x67;&#x69;&#x74;&#x68;&#x75;&#98;&#46;&#99;&#x6f;&#109;</a></p><p><img src="https://zhuzedan.oss-cn-hangzhou.aliyuncs.com/img/image-20220918153517529.png" alt="image-20220918153517529"></p><h4 id="4本地生成博客的具体内容"><a href="#4本地生成博客的具体内容" class="headerlink" title="4本地生成博客的具体内容"></a>4本地生成博客的具体内容</h4><p>hexo init  –初始化博客</p><p>hexo s   –静态生成本地的hexo页面（打开了本地的服务器）</p><h4 id="5将博客发布到github"><a href="#5将博客发布到github" class="headerlink" title="5将博客发布到github"></a>5将博客发布到github</h4><p>配置文件修改(_config.yml)</p><figure class="highlight yml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="attr">deploy:</span></span><br><span class="line">  <span class="attr">type:</span> <span class="string">git</span></span><br><span class="line">  <span class="attr">repository:</span> <span class="string">项目仓库的HTTPS链接</span></span><br><span class="line">  <span class="attr">branch:</span> <span class="string">main</span></span><br></pre></td></tr></table></figure><p>安装hexo-deployer-git自动部署发布工具:为博客安装上传插件</p><p>npm install hexo-deployer-git –save</p><p>hexo g</p><p>hexo d #上传</p>]]></content>
+      
+      
+      
+        <tags>
+            
+            <tag> hexo </tag>
+            
+        </tags>
+      
+    </entry>
+    
+    
+    
+    <entry>
+      <title></title>
+      <link href="/2022/09/20/leetcode%E9%A2%98%E8%A7%A326%E5%88%A0%E9%99%A4%E6%9C%89%E5%BA%8F%E6%95%B0%E7%BB%84%E4%B8%AD%E7%9A%84%E9%87%8D%E5%A4%8D%E9%A1%B9/"/>
+      <url>/2022/09/20/leetcode%E9%A2%98%E8%A7%A326%E5%88%A0%E9%99%A4%E6%9C%89%E5%BA%8F%E6%95%B0%E7%BB%84%E4%B8%AD%E7%9A%84%E9%87%8D%E5%A4%8D%E9%A1%B9/</url>
+      
+        <content type="html"><![CDATA[<p>leetcode题解26删除有序数组中的重复项</p><p>解题要注意：数组是有序数组，说明重复的元素是相邻的。</p><p>要求删除重复元素，实际上就是将不重复的元素移到数组的左侧。</p><p>使用方法：<strong>双指针</strong></p><p>考虑用 2 个指针，一个在前记作 p，一个在后记作 q，算法流程如下：</p><p>1.比较 p 和 q 位置的元素是否相等。</p><p>如果相等，q 后移 1 位<br>如果不相等，将 q 位置的元素复制到 p+1 位置上，p 后移一位，q 后移 1 位<br>重复上述过程，直到 q 等于数组长度。</p><p>返回 p + 1，即为新数组长度。</p><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"> <span class="keyword">public</span> <span class="type">int</span> <span class="title function_">removeDuplicates</span><span class="params">(<span class="type">int</span>[] nums)</span> &#123;</span><br><span class="line">    <span class="keyword">if</span>(nums == <span class="literal">null</span> || nums.length == <span class="number">0</span>) <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">    <span class="type">int</span> <span class="variable">p</span> <span class="operator">=</span> <span class="number">0</span>;</span><br><span class="line">    <span class="type">int</span> <span class="variable">q</span> <span class="operator">=</span> <span class="number">1</span>;</span><br><span class="line">    <span class="keyword">while</span>(q &lt; nums.length)&#123;</span><br><span class="line">        <span class="keyword">if</span>(nums[p] != nums[q])&#123;</span><br><span class="line">            nums[p + <span class="number">1</span>] = nums[q];</span><br><span class="line">            p++;</span><br><span class="line">        &#125;</span><br><span class="line">        q++;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> p + <span class="number">1</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">Solution</span> &#123;</span><br><span class="line">    <span class="keyword">public</span> <span class="type">int</span> <span class="title function_">removeDuplicates</span><span class="params">(<span class="type">int</span>[] nums)</span> &#123;</span><br><span class="line">        <span class="type">int</span> i=<span class="number">0</span>,j=<span class="number">1</span>;</span><br><span class="line">        <span class="keyword">while</span>(j&lt;nums.length)&#123;</span><br><span class="line">            <span class="keyword">if</span>(nums[i] == nums[j])&#123;</span><br><span class="line">                    j++;</span><br><span class="line">            &#125;<span class="keyword">else</span>&#123;</span><br><span class="line">                nums[++i] = nums[j];</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">return</span> i+<span class="number">1</span>;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>]]></content>
+      
+      
+      
+    </entry>
+    
+    
+    
+    <entry>
+      <title></title>
+      <link href="/2022/09/20/error%20unable%20to%20read%20askpass%20response%20from%20&#39;&#39;/"/>
+      <url>/2022/09/20/error%20unable%20to%20read%20askpass%20response%20from%20&#39;&#39;/</url>
+      
+        <content type="html"><![CDATA[<h3 id="error-unable-to-read-askpass-response-from-‘’"><a href="#error-unable-to-read-askpass-response-from-‘’" class="headerlink" title="error: unable to read askpass response from ‘’"></a>error: unable to read askpass response from ‘’</h3><p>今天上班跟平常一样pull代码，发现竟然拉不下来。</p><p><img src="https://zhuzedan.oss-cn-hangzhou.aliyuncs.com/%20img/image-20220920095815254.png" alt="image-20220920095815254"></p><p>上网查询后得到解决方案</p><p>打开自己项目根目录的.git文件，打开config文件</p><p><img src="https://zhuzedan.oss-cn-hangzhou.aliyuncs.com/%20img/image-20220920100042312.png" alt="image-20220920100042312"></p><p>修改url的内容</p><p>修改前</p><p><img src="https://zhuzedan.oss-cn-hangzhou.aliyuncs.com/%20img/image-20220920100148285.png" alt="image-20220920100148285"></p><p>修改</p><p>http:&#x2F;&#x2F;用户名(或者你的邮箱):密码@192.168…..</p><p>修改后</p><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">url = http://zhuzedan:zzd@192.168.2.18:2017/tianyige/v2/admin_antdv.git</span><br></pre></td></tr></table></figure><p>再次拉取代码，成功！</p><p><img src="https://zhuzedan.oss-cn-hangzhou.aliyuncs.com/%20img/image-20220920100610104.png" alt="image-20220920100610104"></p>]]></content>
+      
+      
+      
+    </entry>
+    
+    
+    
+    <entry>
+      <title></title>
+      <link href="/2022/09/19/hexo%E5%AE%89%E8%A3%85butterfly%E4%B8%BB%E9%A2%98%E5%B9%B6%E7%BE%8E%E5%8C%96/"/>
+      <url>/2022/09/19/hexo%E5%AE%89%E8%A3%85butterfly%E4%B8%BB%E9%A2%98%E5%B9%B6%E7%BE%8E%E5%8C%96/</url>
+      
+        <content type="html"><![CDATA[<h2 id="hexo安装butterfly主题并美化"><a href="#hexo安装butterfly主题并美化" class="headerlink" title="hexo安装butterfly主题并美化"></a>hexo安装butterfly主题并美化</h2>]]></content>
+      
+      
+      
+    </entry>
+    
+    
+    
+    <entry>
+      <title></title>
+      <link href="/2022/09/19/npm%20WARN%20config%20global%20--global,%20--local%20are%20deprecated/"/>
+      <url>/2022/09/19/npm%20WARN%20config%20global%20--global,%20--local%20are%20deprecated/</url>
+      
+        <content type="html"><![CDATA[<p>npm WARN config global <code>--global</code>, <code>--local</code> are deprecated. Use <code>--location=glbal</code> instead.</p><p><img src="https://zhuzedan.oss-cn-hangzhou.aliyuncs.com/img/image-20220919194136081.png" alt="image-20220919194136081"></p><p>prefix –location&#x3D;global</p>]]></content>
+      
+      
+      
+    </entry>
+    
+    
+    
+    <entry>
+      <title></title>
+      <link href="/2022/09/18/leetcode14%E9%A2%98-%E6%9C%80%E9%95%BF%E5%85%AC%E5%85%B1%E5%89%8D%E7%BC%80%E9%A2%98%E8%A7%A3/"/>
+      <url>/2022/09/18/leetcode14%E9%A2%98-%E6%9C%80%E9%95%BF%E5%85%AC%E5%85%B1%E5%89%8D%E7%BC%80%E9%A2%98%E8%A7%A3/</url>
+      
+        <content type="html"><![CDATA[<h3 id="leetcode14题-最长公共前缀题解"><a href="#leetcode14题-最长公共前缀题解" class="headerlink" title="leetcode14题-最长公共前缀题解"></a>leetcode14题-最长公共前缀题解</h3><blockquote><p>知识点盲区补充</p></blockquote><p>Java中的startsWith()方法</p><p>startsWith(String str)就是检查形参参数是否与你要检查的字符串开头相同</p><p>startsWith(Sring str,int Index)则是从你要比较的原字符串的指定下标开始和形参作比较</p><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">Solution</span> &#123;</span><br><span class="line">    <span class="keyword">public</span> String <span class="title function_">longestCommonPrefix</span><span class="params">(String[] strs)</span> &#123;</span><br><span class="line">        <span class="type">String</span> <span class="variable">selectOne</span> <span class="operator">=</span> <span class="string">&quot;&quot;</span>;</span><br><span class="line">        <span class="keyword">if</span> (strs.length == <span class="number">0</span>) &#123;</span><br><span class="line">            <span class="keyword">return</span> <span class="string">&quot;&quot;</span>;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="type">String</span> <span class="variable">s</span> <span class="operator">=</span> strs[<span class="number">0</span>];</span><br><span class="line">        <span class="keyword">for</span> (String string:strs)&#123;</span><br><span class="line">            <span class="keyword">while</span> (!string.startsWith(s)) &#123;</span><br><span class="line">                <span class="keyword">if</span> (s.length() == <span class="number">0</span>) &#123;</span><br><span class="line">                    <span class="keyword">return</span> <span class="string">&quot;&quot;</span>;</span><br><span class="line">                &#125;</span><br><span class="line">                s = s.substring(<span class="number">0</span>,s.length()-<span class="number">1</span>);</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">return</span> s;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure><p>字典序概念</p><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">Solution</span> &#123;</span><br><span class="line">    <span class="keyword">public</span> String <span class="title function_">longestCommonPrefix</span><span class="params">(String[] strs)</span> &#123;</span><br><span class="line">        <span class="comment">//按字符串长度排序(字典序)</span></span><br><span class="line">        Arrays.sort(strs);</span><br><span class="line"></span><br><span class="line">        <span class="comment">//比较第一个各最后一个</span></span><br><span class="line">        <span class="type">String</span> <span class="variable">first</span> <span class="operator">=</span> strs[<span class="number">0</span>];</span><br><span class="line">        <span class="type">String</span> <span class="variable">last</span> <span class="operator">=</span> strs[strs.length - <span class="number">1</span>];</span><br><span class="line"></span><br><span class="line">        <span class="keyword">for</span> (<span class="type">int</span> <span class="variable">i</span> <span class="operator">=</span> <span class="number">0</span>; i &lt; first.length(); i++) &#123;</span><br><span class="line">            <span class="keyword">if</span> (first.charAt(i) != last.charAt(i)) &#123;</span><br><span class="line">                <span class="keyword">return</span> first.substring(<span class="number">0</span>, i);</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">return</span> first;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>]]></content>
+      
+      
+      
+    </entry>
+    
+    
+    
+    <entry>
+      <title></title>
+      <link href="/2022/09/17/springsecurity%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0/"/>
+      <url>/2022/09/17/springsecurity%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0/</url>
+      
+        <content type="html"><![CDATA[<p>springsecurity学习笔记</p><h3 id="前后端交互的登录流程"><a href="#前后端交互的登录流程" class="headerlink" title="前后端交互的登录流程"></a>前后端交互的登录流程</h3><p><img src="https://zhuzedan.oss-cn-hangzhou.aliyuncs.com/img/%E7%94%A8%E6%88%B7%E7%99%BB%E5%BD%95%E6%B5%81%E7%A8%8B.png" alt="用户登录流程"></p><p>springsecurity就是一个过滤器链，内置了关于springsecurity的16个过滤器。</p><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@SpringBootApplication</span></span><br><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title class_">SecurityStudyApplication</span> &#123;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title function_">main</span><span class="params">(String[] args)</span> &#123;</span><br><span class="line">        <span class="type">ConfigurableApplicationContext</span> <span class="variable">run</span> <span class="operator">=</span> SpringApplication.run(SecurityStudyApplication.class, args);</span><br><span class="line">        System.out.println(<span class="string">&quot;hello&quot;</span>);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure><p><img src="https://zhuzedan.oss-cn-hangzhou.aliyuncs.com/img/image-20220915090018330.png" alt="image-20220915090018330"></p><h3 id="用户名密码过滤器运行机制"><a href="#用户名密码过滤器运行机制" class="headerlink" title="用户名密码过滤器运行机制"></a>用户名密码过滤器运行机制</h3><p><img src="https://zhuzedan.oss-cn-hangzhou.aliyuncs.com/img/image-20220915102222764.png" alt="image-20220915102222764"></p><p>自定义登录</p><p><img src="https://zhuzedan.oss-cn-hangzhou.aliyuncs.com/img/image-20220915103835244.png" alt="image-20220915103835244"></p><p>登录：</p><ol><li><p>自定义登录接口 调用providemanager方法，登录成功生成jwt，存入redis</p><ol start="2"><li>自定义userdetailamanager实现类  从数据库中访问系统用户</li></ol></li></ol><p>访问资源：自定义认证过滤器</p><ol><li>获取token</li><li>从token中获取userid</li><li>从redis中通过userid获取用户信息</li><li>村SecurityContextHolder</li></ol><h3 id="JWT"><a href="#JWT" class="headerlink" title="JWT"></a>JWT</h3><p>jsonwebtoken，无状态登录模型</p><p>优点：不需要服务器端存session</p><p>组成：头部+载荷+签名</p><h3 id="自定义登录接口"><a href="#自定义登录接口" class="headerlink" title="自定义登录接口"></a>自定义登录接口</h3><p>分析需求：</p><ol><li>定义一个controller登录接口</li><li>放行自定义登录接口</li><li>使用ProviderManager的auth方法进行验证</li><li>生成自己的jwt给前端</li><li>系统用户所有信息放入redis</li></ol>]]></content>
+      
+      
+      
+    </entry>
+    
+    
+    
+    <entry>
+      <title></title>
+      <link href="/2022/09/15/php%E5%8A%A0%E8%BD%BDmysql%E6%89%A9%E5%B1%95/"/>
+      <url>/2022/09/15/php%E5%8A%A0%E8%BD%BDmysql%E6%89%A9%E5%B1%95/</url>
+      
+        <content type="html"><![CDATA[<h2 id="apache配置默认站点"><a href="#apache配置默认站点" class="headerlink" title="apache配置默认站点"></a>apache配置默认站点</h2><p>1.让apache确定服务器上访问的位置： 网站文件夹所在位置</p><p>2.方便用户使用名字访问对应的网站： 给文件夹对应的取一个别名</p><h2 id="安装php"><a href="#安装php" class="headerlink" title="安装php"></a>安装php</h2><p>解压缩后添加环境变量</p><h2 id="Apache加载php"><a href="#Apache加载php" class="headerlink" title="Apache加载php"></a>Apache加载php</h2><p>1apache加载php模块，在apache的住配置文件中加载对应的php提供的模块 httpd.conf文件</p><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">#加载php5</span><br><span class="line">#LoadModule php5_module &#x27;‪E:/php/php-5.6.13/php5apache2_4.dll&#x27;</span><br><span class="line">#将php配置文件加载到apache配置文件中</span><br><span class="line">#PHPIniDir &#x27;E:/php/php-5.6.13&#x27;</span><br><span class="line">#分配给php</span><br><span class="line">AddType application/x-httpd-php .php</span><br></pre></td></tr></table></figure><p><img src="https://zhuzedan.oss-cn-hangzhou.aliyuncs.com/img/image-20220904225152988.png" alt="image-20220904225152988"></p><h2 id="php加载mysql扩展"><a href="#php加载mysql扩展" class="headerlink" title="php加载mysql扩展"></a>php加载mysql扩展</h2><p>1.打开php.ini文件</p><p><img src="https://zhuzedan.oss-cn-hangzhou.aliyuncs.com/img/image-20220904212044524.png" alt="image-20220904212044524"></p><p>把mysqldll的分号去掉</p><p>2.php中所有的扩展都在ext文件中，需要制定扩展所在路径</p><p><img src="https://zhuzedan.oss-cn-hangzhou.aliyuncs.com/img/image-20220904212640981.png" alt="image-20220904212640981"></p><p>3.php.ini已经被apache加载，重启apache才会生效</p><p>补充：设定php系统时区</p><p><img src="https://zhuzedan.oss-cn-hangzhou.aliyuncs.com/img/image-20220904212914757.png" alt="image-20220904212914757"></p>]]></content>
+      
+      
+      
+    </entry>
+    
+    
+    
+    <entry>
+      <title></title>
+      <link href="/2022/09/03/docker%E7%9A%84%E5%9F%BA%E6%9C%AC%E7%BB%84%E6%88%90/"/>
+      <url>/2022/09/03/docker%E7%9A%84%E5%9F%BA%E6%9C%AC%E7%BB%84%E6%88%90/</url>
+      
+        <content type="html"><![CDATA[<p>Doker学习笔记</p><h2 id="docker的基本组成"><a href="#docker的基本组成" class="headerlink" title="docker的基本组成"></a>docker的基本组成</h2><p>镜像  –只读模板，镜像可以用来创建docker容器，一个镜像可以创建多个容器</p><p>容器 –类似于java中new出来的实例对象，看作简易的linux的环境</p><p>仓库  –集中存放镜像文件的场所</p>]]></content>
+      
+      
+      
+    </entry>
+    
+    
+    
+    <entry>
+      <title></title>
+      <link href="/2022/08/22/springcloud/"/>
+      <url>/2022/08/22/springcloud/</url>
+      
+        <content type="html"><![CDATA[<p>springcloud</p>]]></content>
+      
+      
+      
+    </entry>
+    
+    
+  
+  
+</search>
